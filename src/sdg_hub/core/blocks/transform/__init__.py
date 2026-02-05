@@ -12,6 +12,7 @@ from .json_structure_block import JSONStructureBlock
 from .melt_columns import MeltColumnsBlock
 from .rename_columns import RenameColumnsBlock
 from .row_multiplier import RowMultiplierBlock
+from .sampler import SamplerBlock
 from .text_concat import TextConcatBlock
 from .uniform_col_val_setter import UniformColumnValueSetter
 
@@ -23,5 +24,6 @@ __all__ = [
     "RowMultiplierBlock",
     "IndexBasedMapperBlock",
     "RenameColumnsBlock",
+    "SamplerBlock",
     "UniformColumnValueSetter",
 ]
