@@ -139,11 +139,35 @@ src/sdg_hub/flows/[category]/[use_case]/[variant]/
 - `docs/section-updates` - Documentation updates
 
 **Commit Messages:**
-Follow conventional commits:
+We use [Conventional Commits](https://www.conventionalcommits.org/) format, enforced via pre-commit hook.
+
+Format: `<type>(<scope>): <description>`
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `docs` | Documentation only |
+| `style` | Code style (formatting, no logic change) |
+| `refactor` | Code refactoring |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `build` | Build system or dependencies |
+| `ci` | CI/CD configuration |
+| `chore` | Maintenance tasks |
+| `revert` | Reverting a previous commit |
+
+Examples:
 ```
 feat(blocks): add TextSummarizerBlock for document summarization
 fix(flows): correct parameter validation in QA generation flow
 docs(blocks): update LLM block examples with new model config
+```
+
+To enable pre-commit hooks locally:
+```bash
+pre-commit install                         # Linting hooks (isort, ruff)
+pre-commit install --hook-type commit-msg  # Commit message validation
 ```
 
 **Pull Request Process:**
