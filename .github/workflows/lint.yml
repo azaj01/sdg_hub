@@ -47,9 +47,18 @@ jobs:
 
       - name: Setup uv
         uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
 
       - name: Run Ruff format check
         run: uvx ruff@${{ env.RUFF_VERSION }} format --check src/ tests/
 
       - name: Run Ruff linter
         run: uvx ruff@${{ env.RUFF_VERSION }} check src/ tests/
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run mypy type checker
+        run: uv run mypy src/sdg_hub --show-error-codes
