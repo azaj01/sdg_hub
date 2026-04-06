@@ -3,9 +3,10 @@
 
 from typing import Any, Optional
 import asyncio
+import json
 import uuid
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field, PrivateAttr, ValidationError
 from tqdm import tqdm
 import pandas as pd
 
@@ -121,6 +122,13 @@ class AgentBlock(BaseBlock):
         description="Maximum concurrent requests in async mode",
         gt=0,
     )
+    connector_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Extra keyword arguments passed to the connector constructor. "
+            "Use for framework-specific settings like assistant_id for LangGraph."
+        ),
+    )
 
     # Private attributes
     _connector: Optional[BaseAgentConnector] = PrivateAttr(default=None)
@@ -143,6 +151,7 @@ class AgentBlock(BaseBlock):
             self.agent_api_key,
             self.timeout,
             self.max_retries,
+            json.dumps(self.connector_kwargs, sort_keys=True, default=str),
         )
         if self._connector is None or self._connector_config_key != config_key:
             connector_class = ConnectorRegistry.get(self.agent_framework)
@@ -152,7 +161,14 @@ class AgentBlock(BaseBlock):
                 timeout=self.timeout,
                 max_retries=self.max_retries,
             )
-            self._connector = connector_class(config=config)
+            try:
+                self._connector = connector_class(
+                    config=config, **self.connector_kwargs
+                )
+            except (TypeError, ValidationError) as e:
+                raise ConnectorError(
+                    f"Invalid connector_kwargs for '{self.agent_framework}': {e}"
+                ) from e
             self._connector_config_key = config_key
         return self._connector
 
