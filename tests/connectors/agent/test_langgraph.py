@@ -60,6 +60,28 @@ class TestLangGraphConnector:
 
         assert request["assistant_id"] == "my-graph"
 
+    def test_build_request_with_run_config(self):
+        """Test request includes config when run_config is set."""
+        connector = LangGraphConnector(
+            config=ConnectorConfig(url="http://test"),
+            run_config={"configurable": {"model": "gpt-4o"}},
+        )
+
+        messages = [{"role": "user", "content": "Hello"}]
+        request = connector.build_request(messages, "session-1")
+
+        assert request["assistant_id"] == "agent"
+        assert request["config"] == {"configurable": {"model": "gpt-4o"}}
+
+    def test_build_request_without_run_config(self):
+        """Test request omits config key when run_config is empty."""
+        connector = LangGraphConnector(config=ConnectorConfig(url="http://test"))
+
+        messages = [{"role": "user", "content": "Hello"}]
+        request = connector.build_request(messages, "session-1")
+
+        assert "config" not in request
+
     def test_parse_response_valid(self):
         """Test response parsing returns raw dict."""
         connector = LangGraphConnector(config=ConnectorConfig(url="http://test"))
@@ -172,6 +194,82 @@ class TestLangGraphConnector:
         assert run_payload["assistant_id"] == "my-custom-graph"
 
 
+class TestLangGraphErrorPaths:
+    """Test error handling in LangGraphConnector."""
+
+    def test_build_request_empty_messages(self):
+        """Test build_request raises on empty messages."""
+        connector = LangGraphConnector(config=ConnectorConfig(url="http://test"))
+        with pytest.raises(ConnectorError, match="empty messages"):
+            connector.build_request([], "session-1")
+
+    def test_parse_response_empty_dict(self):
+        """Test parse_response raises on empty dict."""
+        connector = LangGraphConnector(config=ConnectorConfig(url="http://test"))
+        with pytest.raises(ConnectorError, match="empty response"):
+            connector.parse_response({})
+
+    def test_parse_response_missing_messages_warns(self):
+        """Test parse_response warns when messages key is absent."""
+        connector = LangGraphConnector(config=ConnectorConfig(url="http://test"))
+        # Should not raise, but should warn
+        result = connector.parse_response({"status": "ok"})
+        assert result == {"status": "ok"}
+
+    def test_assistant_id_empty_string_rejected(self):
+        """Test that empty assistant_id is rejected by validation."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            LangGraphConnector(
+                config=ConnectorConfig(url="http://test"),
+                assistant_id="",
+            )
+
+    @pytest.mark.asyncio
+    async def test_send_async_missing_thread_id(self):
+        """Test _send_async raises when thread response has no thread_id."""
+        connector = LangGraphConnector(
+            config=ConnectorConfig(url="http://localhost:2024")
+        )
+        mock_client = AsyncMock()
+        mock_client.post.return_value = {"status": "ok"}  # No thread_id
+
+        with patch.object(connector, "_get_http_client", return_value=mock_client):
+            with pytest.raises(ConnectorError, match="missing 'thread_id'"):
+                await connector._send_async([{"role": "user", "content": "hi"}], "s1")
+
+    @pytest.mark.asyncio
+    async def test_send_async_thread_creation_failure(self):
+        """Test _send_async wraps thread creation errors with context."""
+        connector = LangGraphConnector(
+            config=ConnectorConfig(url="http://localhost:2024")
+        )
+        mock_client = AsyncMock()
+        mock_client.post.side_effect = Exception("Connection refused")
+
+        with patch.object(connector, "_get_http_client", return_value=mock_client):
+            with pytest.raises(ConnectorError, match="thread creation failed"):
+                await connector._send_async([{"role": "user", "content": "hi"}], "s1")
+
+    @pytest.mark.asyncio
+    async def test_send_async_run_execution_failure(self):
+        """Test _send_async wraps run execution errors with context."""
+        connector = LangGraphConnector(
+            config=ConnectorConfig(url="http://localhost:2024")
+        )
+        mock_client = AsyncMock()
+        # Thread creation succeeds, run fails
+        mock_client.post.side_effect = [
+            {"thread_id": "thread-1"},
+            Exception("Timeout"),
+        ]
+
+        with patch.object(connector, "_get_http_client", return_value=mock_client):
+            with pytest.raises(ConnectorError, match="run execution failed"):
+                await connector._send_async([{"role": "user", "content": "hi"}], "s1")
+
+
 class TestLangGraphExtractText:
     """Test LangGraphConnector.extract_text class method."""
 
@@ -234,7 +332,12 @@ class TestLangGraphExtractToolTrace:
                         {"name": "get_weather", "args": {"city": "NYC"}, "id": "c1"}
                     ],
                 },
-                {"type": "tool", "name": "get_weather", "content": '{"temp": 72}'},
+                {
+                    "type": "tool",
+                    "name": "get_weather",
+                    "content": '{"temp": 72}',
+                    "tool_call_id": "c1",
+                },
                 {"type": "ai", "content": "It's 72°F in NYC."},
             ]
         }
@@ -245,6 +348,7 @@ class TestLangGraphExtractToolTrace:
         assert trace[0]["tool_calls"][0]["name"] == "get_weather"
         assert trace[1]["type"] == "tool_result"
         assert trace[1]["name"] == "get_weather"
+        assert trace[1]["tool_call_id"] == "c1"
 
     def test_no_tool_calls_returns_none(self):
         response = {

@@ -59,6 +59,15 @@ class LangGraphConnector(BaseAgentConnector):
         min_length=1,
         description="The assistant ID or graph name to run.",
     )
+    run_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Optional configuration dict passed in the run payload. "
+            "Merged as the 'config' key in the LangGraph /runs/wait request. "
+            "Use this to pass runtime parameters to the graph via "
+            "'configurable', e.g. ``{'configurable': {'model': 'gpt-4o'}}``."
+        ),
+    )
 
     def _build_headers(self) -> dict[str, str]:
         """Build headers for LangGraph API.
@@ -108,10 +117,13 @@ class LangGraphConnector(BaseAgentConnector):
                 "Cannot send empty messages list to LangGraph. "
                 "Expected at least one message with role and content."
             )
-        return {
+        payload = {
             "assistant_id": self.assistant_id,
             "input": {"messages": messages},
         }
+        if self.run_config:
+            payload["config"] = self.run_config
+        return payload
 
     def parse_response(self, response: dict[str, Any]) -> dict[str, Any]:
         """Parse LangGraph response.
@@ -148,6 +160,7 @@ class LangGraphConnector(BaseAgentConnector):
             logger.warning(
                 "LangGraph response has no 'messages' key. "
                 f"Available keys: {list(response.keys())}. "
+                "Text and tool trace extraction will return None. "
                 "This may indicate an API error or misconfigured graph."
             )
 
@@ -184,25 +197,36 @@ class LangGraphConnector(BaseAgentConnector):
 
         # Step 1: Create a thread
         logger.debug(f"Creating thread at {base_url}/threads")
-        thread_response = await http_client.post(
-            url=f"{base_url}/threads",
-            payload={"metadata": {"session_id": session_id}},
-            headers=headers,
-        )
+        try:
+            thread_response = await http_client.post(
+                url=f"{base_url}/threads",
+                payload={"metadata": {"session_id": session_id}},
+                headers=headers,
+            )
+        except Exception as e:
+            raise ConnectorError(f"LangGraph thread creation failed: {e}") from e
         thread_id = thread_response.get("thread_id")
         if not thread_id:
-            raise ConnectorError("LangGraph /threads response missing 'thread_id'")
+            raise ConnectorError(
+                f"LangGraph /threads response missing 'thread_id'. "
+                f"Response: {thread_response}"
+            )
         logger.debug(f"Created thread {thread_id}")
 
         # Step 2: Run agent on the thread
         request = self.build_request(messages, session_id)
         run_url = f"{base_url}/threads/{thread_id}/runs/wait"
         logger.debug(f"Sending run request to {run_url}")
-        raw_response = await http_client.post(
-            url=run_url,
-            payload=request,
-            headers=headers,
-        )
+        try:
+            raw_response = await http_client.post(
+                url=run_url,
+                payload=request,
+                headers=headers,
+            )
+        except Exception as e:
+            raise ConnectorError(
+                f"LangGraph run execution failed on thread {thread_id}: {e}"
+            ) from e
         logger.debug(f"Received response from {run_url}")
 
         return self.parse_response(raw_response)
@@ -231,6 +255,7 @@ class LangGraphConnector(BaseAgentConnector):
 
         for msg in reversed(messages):
             if not isinstance(msg, dict):
+                logger.debug(f"Skipping non-dict message in extract_text: {type(msg)}")
                 continue
             role = msg.get("type") or msg.get("role", "")
             if role in ("ai", "assistant"):
@@ -287,6 +312,9 @@ class LangGraphConnector(BaseAgentConnector):
         tool_entries: list[dict[str, Any]] = []
         for msg in messages:
             if not isinstance(msg, dict):
+                logger.debug(
+                    f"Skipping non-dict message in extract_tool_trace: {type(msg)}"
+                )
                 continue
             role = msg.get("type") or msg.get("role", "")
             if role in ("ai", "assistant") and msg.get("tool_calls"):
@@ -294,12 +322,14 @@ class LangGraphConnector(BaseAgentConnector):
                     {"type": "tool_use", "tool_calls": msg["tool_calls"]}
                 )
             elif role == "tool":
-                tool_entries.append(
-                    {
-                        "type": "tool_result",
-                        "name": msg.get("name", ""),
-                        "content": msg.get("content", ""),
-                    }
-                )
+                tool_result: dict[str, Any] = {
+                    "type": "tool_result",
+                    "name": msg.get("name", ""),
+                    "content": msg.get("content", ""),
+                }
+                tc_id = msg.get("tool_call_id") or msg.get("id")
+                if tc_id:
+                    tool_result["tool_call_id"] = tc_id
+                tool_entries.append(tool_result)
 
         return tool_entries if tool_entries else None

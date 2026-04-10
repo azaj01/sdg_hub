@@ -12,6 +12,7 @@ from .llm import (
     LLMResponseExtractorBlock,
     PromptBuilderBlock,
 )
+from .mcp import MCPAgentBlock
 from .parsing import JSONParserBlock, RegexParserBlock, TagParserBlock, TextParserBlock
 from .registry import BlockRegistry
 from .transform import (
@@ -41,4 +42,5 @@ __all__ = [
     "UniformColumnValueSetter",
     "LLMChatBlock",
     "LLMResponseExtractorBlock",
+    "MCPAgentBlock",
 ]
