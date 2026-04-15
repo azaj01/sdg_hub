@@ -28,6 +28,7 @@ flow = Flow.from_yaml(flow_path)
 | red_team | Red Teaming Prompt Generation | `major-sage-742` | IlyaGusev/gemma-2-9b-it-abliterated | policy_concept, concept_definition |
 | agentic | MCP Server Distillation | `new-night-835` | openai/gpt-5.2 | tool_list, mcp_server_name, mcp_server_description |
 | evaluation | RAG Evaluation Dataset | `loud-dawn-245` | openai/gpt-oss-120b | document, document_outline |
+| evaluation | RAG Evaluation ICL Dataset | `keen-pearl-546` | openai/gpt-oss-120b | document, document_outline, icl_document, icl_query_1-3 |
 | evaluation | Agent Tool-Use Evaluation | `eager-path-837` | openai/gpt-4o | question, expert_answer_truncated, expert_trace_formatted, model_answer, model_trace_formatted |
 
 ---
@@ -353,6 +354,47 @@ flow.set_model_config(
 dataset = Dataset.from_dict({
     "document": ["Your document text..."],
     "document_outline": ["Document Title"],
+})
+result = flow.generate(dataset, max_concurrency=20)
+```
+
+### RAG Evaluation ICL Dataset (keen-pearl-546)
+
+Location: `src/sdg_hub/flows/evaluation/rag_evaluation_icl/`
+
+Generates realistic Q&A pairs for RAG evaluation using the 3-stage question
+generation pipeline with ICL-driven style guidance. Uses the same architecture
+as the base RAG Evaluation flow but adds in-context learning examples so
+questions are generated in a realistic user style instead of textbook style.
+
+Default model: `openai/gpt-oss-120b`
+
+Required columns: `document`, `document_outline`, `icl_document`,
+`icl_query_1`, `icl_query_2`, `icl_query_3`
+
+Tags: `rag-evaluation`, `qa-pairs`, `icl`
+
+```python
+from datasets import Dataset
+from sdg_hub import Flow
+from sdg_hub import FlowRegistry
+
+FlowRegistry.discover_flows()
+flow = Flow.from_yaml(
+    FlowRegistry.get_flow_path_safe("keen-pearl-546")
+)
+flow.set_model_config(
+    model="openai/gpt-oss-120b",
+    api_key="your-key",
+)
+
+dataset = Dataset.from_dict({
+    "document": ["Your document text..."],
+    "document_outline": ["Document Title"],
+    "icl_document": ["Example document for style reference..."],
+    "icl_query_1": ["How do I configure X when Y keeps timing out?"],
+    "icl_query_2": ["We set up a pipeline but the labels get reused - is that expected?"],
+    "icl_query_3": ["What's the best way to debug failed builds?"],
 })
 result = flow.generate(dataset, max_concurrency=20)
 ```
