@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Agent block for integrating external agent frameworks."""
 
-from typing import Any, Optional
+from typing import Any, Optional, cast
 import asyncio
 import json
 import uuid
@@ -164,15 +164,29 @@ class AgentBlock(BaseBlock):
                 timeout=self.timeout,
                 max_retries=self.max_retries,
             )
+            # Validate connector_kwargs keys before construction so that
+            # typos are surfaced immediately instead of being silently
+            # ignored by Pydantic.
+            if self.connector_kwargs:
+                valid_fields = connector_class.model_fields.keys() - {"config"}
+                unknown = sorted(set(self.connector_kwargs) - valid_fields)
+                if unknown:
+                    raise ConnectorError(
+                        f"Unknown connector_kwargs for "
+                        f"'{self.agent_framework}': {unknown}. "
+                        f"Valid options: {sorted(valid_fields)}"
+                    )
             try:
-                self._connector = connector_class(
-                    config=config, **self.connector_kwargs
+                self._connector = cast(
+                    BaseAgentConnector,
+                    connector_class(config=config, **self.connector_kwargs),
                 )
             except (TypeError, ValidationError) as e:
                 raise ConnectorError(
                     f"Invalid connector_kwargs for '{self.agent_framework}': {e}"
                 ) from e
             self._connector_config_key = config_key
+        assert self._connector is not None  # guaranteed by the branch above
         return self._connector
 
     def _get_messages_col(self) -> str:
