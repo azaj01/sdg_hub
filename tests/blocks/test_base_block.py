@@ -346,9 +346,11 @@ class TestLogging:
             ]
         return pd.DataFrame(data)
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_log_input_data(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_log_input_data(self, mock_logger, mock_console):
         """Test input data logging."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
         block = DummyBlock(
             block_name="test_block", input_cols=["input"], output_cols=["output"]
@@ -356,7 +358,7 @@ class TestLogging:
 
         block._log_input_data(dataset)
 
-        # Verify console.print was called
+        # Verify _console.print was called
         mock_console.print.assert_called_once()
 
         # Get the panel that was printed
@@ -367,9 +369,25 @@ class TestLogging:
         assert "test_block" in str(panel.title)
         assert panel.border_style == "blue"
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_log_output_data(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_log_input_data_logging_disabled(self, mock_logger, mock_console):
+        """Test input data logging is suppressed when logging level is above INFO."""
+        mock_logger.isEnabledFor.return_value = False
+        dataset = self.create_test_dataset()
+        block = DummyBlock(
+            block_name="test_block", input_cols=["input"], output_cols=["output"]
+        )
+
+        block._log_input_data(dataset)
+
+        mock_console.print.assert_not_called()
+
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_log_output_data(self, mock_logger, mock_console):
         """Test output data logging."""
+        mock_logger.isEnabledFor.return_value = True
         input_dataset = self.create_test_dataset()
 
         # Create output dataset with changes
@@ -383,7 +401,7 @@ class TestLogging:
         block = DummyBlock(block_name="test_block")
         block._log_output_data(input_dataset, output_dataset)
 
-        # Verify console.print was called
+        # Verify _console.print was called
         mock_console.print.assert_called_once()
 
         # Get the panel that was printed
@@ -393,6 +411,23 @@ class TestLogging:
         # Verify panel properties
         assert "test_block - Complete" in str(panel.title)
         assert panel.border_style == "green"
+
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_log_output_data_logging_disabled(self, mock_logger, mock_console):
+        """Test output data logging is suppressed when logging level is above INFO."""
+        mock_logger.isEnabledFor.return_value = False
+        input_dataset = self.create_test_dataset()
+        output_data = [
+            {"input": "test1", "category": "A", "new_col": "value1"},
+            {"input": "test2", "category": "B", "new_col": "value2"},
+        ]
+        output_dataset = pd.DataFrame(output_data)
+
+        block = DummyBlock(block_name="test_block")
+        block._log_output_data(input_dataset, output_dataset)
+
+        mock_console.print.assert_not_called()
 
 
 class TestCallMethod:
@@ -407,9 +442,11 @@ class TestCallMethod:
             ]
         return pd.DataFrame(data)
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_success(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_success(self, mock_logger, mock_console):
         """Test successful __call__ execution."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
         block = DummyBlock(
             block_name="test_block",
@@ -429,9 +466,11 @@ class TestCallMethod:
         # Verify logging was called (input and output panels)
         assert mock_console.print.call_count == 2
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_with_kwargs_override_success(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_with_kwargs_override_success(self, mock_logger, mock_console):
         """Test successful __call__ execution with kwargs override."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         # Create a dummy block with custom field for override testing
@@ -468,7 +507,7 @@ class TestCallMethod:
         # Verify logging was called (input and output panels)
         assert mock_console.print.call_count == 2
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     @patch("sdg_hub.core.blocks.base.logger")
     def test_call_with_invalid_kwargs_field(self, mock_logger, mock_console):
         """Test __call__ with extra kwargs field name.
@@ -476,6 +515,7 @@ class TestCallMethod:
         BaseBlock now accepts extra parameters (extra='allow') to support
         dynamic parameter forwarding to LLM blocks, so no warning is expected.
         """
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
         block = DummyBlock(
             block_name="test_block",
@@ -498,9 +538,11 @@ class TestCallMethod:
         # Verify logging was called (input and output panels)
         assert mock_console.print.call_count == 2
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_with_invalid_kwargs_value(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_with_invalid_kwargs_value(self, mock_logger, mock_console):
         """Test __call__ with invalid kwargs field value."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         # Create a dummy block with validated field
@@ -519,9 +561,11 @@ class TestCallMethod:
         # Verify no logging was called since validation failed early
         assert mock_console.print.call_count == 0
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_kwargs_restoration_on_exception(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_kwargs_restoration_on_exception(self, mock_logger, mock_console):
         """Test that kwargs are restored even if generation fails."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         class FailingBlock(DummyBlock):
@@ -542,9 +586,11 @@ class TestCallMethod:
         # Verify original value was restored despite exception
         assert block.custom_field == "original"
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_multiple_kwargs_override(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_multiple_kwargs_override(self, mock_logger, mock_console):
         """Test __call__ with multiple kwargs overrides."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         class MultiFieldBlock(DummyBlock):
@@ -574,9 +620,11 @@ class TestCallMethod:
         assert block.field2 == 42
         assert block.field3 is True
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_kwargs_no_overrides(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_kwargs_no_overrides(self, mock_logger, mock_console):
         """Test that normal execution without kwargs still works."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         class NormalBlock(DummyBlock):
@@ -624,9 +672,11 @@ class TestCallMethod:
         assert block.parent_field == "parent_value"
         assert block.child_field == "child_value"
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_validation_failure(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_validation_failure(self, mock_logger, mock_console):
         """Test __call__ with validation failure."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
         block = DummyBlock(block_name="test_block", input_cols=["missing_col"])
 
@@ -639,9 +689,11 @@ class TestCallMethod:
         # Verify input logging was called but not output logging
         assert mock_console.print.call_count == 1
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_empty_dataset(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_empty_dataset(self, mock_logger, mock_console):
         """Test __call__ with empty dataset."""
+        mock_logger.isEnabledFor.return_value = True
         empty_dataset = pd.DataFrame([])
         block = DummyBlock(block_name="test_block")
 
@@ -654,9 +706,11 @@ class TestCallMethod:
         # Verify input logging was called
         assert mock_console.print.call_count == 1
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_call_column_collision(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_call_column_collision(self, mock_logger, mock_console):
         """Test __call__ with output column collision."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
         block = DummyBlock(
             block_name="test_block", output_cols=["input"]
@@ -684,7 +738,7 @@ class TestStructuralFieldProtection:
             ]
         return pd.DataFrame(data)
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_reject_input_cols_override(self, mock_console):
         """Test that overriding input_cols at runtime raises ValueError."""
         dataset = self.create_test_dataset()
@@ -697,7 +751,7 @@ class TestStructuralFieldProtection:
         with pytest.raises(ValueError, match="Cannot override structural fields"):
             block(dataset, input_cols=["category"])
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_reject_output_cols_override(self, mock_console):
         """Test that overriding output_cols at runtime raises ValueError."""
         dataset = self.create_test_dataset()
@@ -710,7 +764,7 @@ class TestStructuralFieldProtection:
         with pytest.raises(ValueError, match="Cannot override structural fields"):
             block(dataset, output_cols=["other_output"])
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_reject_block_name_override(self, mock_console):
         """Test that overriding block_name at runtime raises ValueError."""
         dataset = self.create_test_dataset()
@@ -723,7 +777,7 @@ class TestStructuralFieldProtection:
         with pytest.raises(ValueError, match="Cannot override structural fields"):
             block(dataset, block_name="new_name")
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_reject_block_type_override(self, mock_console):
         """Test that overriding block_type at runtime raises ValueError."""
         dataset = self.create_test_dataset()
@@ -736,7 +790,7 @@ class TestStructuralFieldProtection:
         with pytest.raises(ValueError, match="Cannot override structural fields"):
             block(dataset, block_type="llm")
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_reject_multiple_structural_overrides(self, mock_console):
         """Test that overriding multiple structural fields lists all in the error."""
         dataset = self.create_test_dataset()
@@ -755,7 +809,7 @@ class TestStructuralFieldProtection:
         assert "input_cols" in str(exc_info.value)
         assert "output_cols" in str(exc_info.value)
 
-    @patch("sdg_hub.core.blocks.base.console")
+    @patch("sdg_hub.core.blocks.base._console")
     def test_allow_non_structural_overrides(self, mock_console):
         """Test that non-structural fields can still be overridden."""
         dataset = self.create_test_dataset()
@@ -1114,9 +1168,11 @@ class TestCustomValidation:
         ):
             block(dataset)
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_custom_validation_with_logging(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_custom_validation_with_logging(self, mock_logger, mock_console):
         """Test that custom validation works with Rich logging."""
+        mock_logger.isEnabledFor.return_value = True
         dataset = self.create_test_dataset()
 
         class TestBlockWithLoggingValidation(DummyBlock):
@@ -1267,9 +1323,11 @@ class TestEdgeCases:
         result = block._normalize_columns("")
         assert result == [""]
 
-    @patch("sdg_hub.core.blocks.base.console")
-    def test_logging_with_many_columns(self, mock_console):
+    @patch("sdg_hub.core.blocks.base._console")
+    @patch("sdg_hub.core.blocks.base.logger")
+    def test_logging_with_many_columns(self, mock_logger, mock_console):
         """Test logging with datasets that have many columns."""
+        mock_logger.isEnabledFor.return_value = True
         # Create dataset with many columns
         data = [{f"col_{i}": f"value_{i}" for i in range(50)}]
         dataset = pd.DataFrame(data)

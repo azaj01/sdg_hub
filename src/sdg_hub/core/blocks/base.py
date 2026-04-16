@@ -8,6 +8,7 @@ with unified constructor patterns, column handling, and common functionality.
 # Standard
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Optional, Union
+import logging
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rich.console import Console
@@ -26,7 +27,7 @@ from ..utils.error_handling import (
 from ..utils.logger_config import setup_logger
 
 logger = setup_logger(__name__)
-console = Console()
+_console = Console()
 
 
 class BaseBlock(BaseModel, ABC):
@@ -199,6 +200,8 @@ class BaseBlock(BaseModel, ABC):
 
     def _log_input_data(self, df: pd.DataFrame) -> None:
         """Print a summary of the input DataFrame with Rich formatting."""
+        if not logger.isEnabledFor(logging.INFO):
+            return
         row_count = len(df)
         columns = df.columns.tolist()
         content = Text()
@@ -217,12 +220,18 @@ class BaseBlock(BaseModel, ABC):
             else "None specified"
         )
         content.append(f"Expected Output Columns: {expected}", style="green")
-        console.print(
-            Panel(content, title=f"[bold]{self.block_name}[/bold]", border_style="blue")
+        _console.print(
+            Panel(
+                content,
+                title=f"[bold]{self.block_name}[/bold]",
+                border_style="blue",
+            )
         )
 
     def _log_output_data(self, input_df: pd.DataFrame, output_df: pd.DataFrame) -> None:
         """Print a Rich panel summarizing output DataFrame differences."""
+        if not logger.isEnabledFor(logging.INFO):
+            return
         in_rows, out_rows = len(input_df), len(output_df)
         in_cols = set(input_df.columns.tolist())
         out_cols = set(output_df.columns.tolist())
@@ -243,7 +252,7 @@ class BaseBlock(BaseModel, ABC):
         content.append(
             f"\U0001f4cb Final Columns: {', '.join(sorted(out_cols))}", style="white"
         )
-        console.print(
+        _console.print(
             Panel(
                 content,
                 title=f"[bold green]{self.block_name} - Complete[/bold green]",
