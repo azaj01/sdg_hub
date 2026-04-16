@@ -427,7 +427,7 @@ const NodeSidebar = ({ onAddNode, onDragStart, onDragEnd, onLoadFlowTemplate, on
           const fourthBlock = blocks[i + 3];
           const fifthBlock = blocks[i + 4];
           
-          if (fourthBlock?.block_type === 'TextParserBlock' && 
+          if ((fourthBlock?.block_type === 'TagParserBlock' || fourthBlock?.block_type === 'RegexParserBlock') &&
               fifthBlock?.block_type === 'ColumnValueFilterBlock') {
             // This is an Eval node (any prompt+llm+extractor+parser+filter pattern)
             const nodeId = generateNodeId();
@@ -450,8 +450,15 @@ const NodeSidebar = ({ onAddNode, onDragStart, onDragEnd, onLoadFlowTemplate, on
                 system_message,
                 user_message,
                 prompt_config_path: promptPath,
-                start_tags: fourthBlock.block_config?.start_tags || [],
-                end_tags: fourthBlock.block_config?.end_tags || [],
+                start_tags: fourthBlock?.block_type === 'TagParserBlock'
+                  ? (fourthBlock.block_config?.start_tags || [])
+                  : [],
+                end_tags: fourthBlock?.block_type === 'TagParserBlock'
+                  ? (fourthBlock.block_config?.end_tags || [])
+                  : [],
+                parsing_pattern: fourthBlock?.block_type === 'RegexParserBlock'
+                  ? (fourthBlock.block_config?.parsing_pattern || '')
+                  : '',
                 filter_value: fifthBlock.block_config?.filter_value || 'YES',
                 filter_operation: fifthBlock.block_config?.operation || 'eq',
                 max_tokens: nextBlock.block_config?.max_tokens || 2048,
@@ -529,8 +536,8 @@ const NodeSidebar = ({ onAddNode, onDragStart, onDragEnd, onLoadFlowTemplate, on
         }
       }
 
-      // TextParserBlock -> Parser node
-      if (blockType === 'TextParserBlock') {
+      // TagParserBlock or RegexParserBlock -> Parser node
+      if (blockType === 'TagParserBlock' || blockType === 'RegexParserBlock') {
         visualNodes.push({
           id: generateNodeId(),
           type: NODE_TYPES.PARSER,

@@ -162,7 +162,7 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
             description: 'Parses LLM response'
           },
           {
-            block_type: 'TextParserBlock',
+            block_type: 'TagParserBlock',
             block_config: {
               block_name: `parse_${baseName}`,
               input_cols: `${baseName}_parser_content`,
@@ -170,7 +170,7 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
               start_tags: [''],
               end_tags: [''],
             },
-            displayName: 'Text Parser',
+            displayName: 'Tag Parser',
             description: 'Extracts final summary text'
           }
         ];
@@ -214,16 +214,14 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
             description: 'Parses LLM response'
           },
           {
-            block_type: 'TextParserBlock',
+            block_type: 'RegexParserBlock',
             block_config: {
               block_name: `parse_${baseName}`,
               input_cols: `${baseName}_parser_content`,
               output_cols: ['question', 'response'],
               parsing_pattern: '\\[(?:Question|QUESTION)\\]\\s*(.*?)\\s*\\[(?:Answer|ANSWER)\\]\\s*(.*?)\\s*(?=\\[(?:Question|QUESTION)\\]|$)',
-              start_tags: [],
-              end_tags: [],
             },
-            displayName: 'Text Parser',
+            displayName: 'Regex Parser',
             description: 'Extracts questions and answers'
           }
         ];
@@ -267,7 +265,7 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
             description: 'Parses evaluation response'
           },
           {
-            block_type: 'TextParserBlock',
+            block_type: 'TagParserBlock',
             block_config: {
               block_name: `parse_${baseName}`,
               input_cols: `${baseName}_parser_content`,
@@ -275,7 +273,7 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
               start_tags: ['[Start of Explanation]', '[Start of Answer]'],
               end_tags: ['[End of Explanation]', '[End of Answer]'],
             },
-            displayName: 'Text Parser',
+            displayName: 'Tag Parser',
             description: 'Extracts explanation and judgment'
           },
           {
@@ -593,8 +591,8 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
           </>
         )}
 
-        {/* TextParserBlock specific */}
-        {bundleBlock.block_type === 'TextParserBlock' && (
+        {/* TagParserBlock specific */}
+        {bundleBlock.block_type === 'TagParserBlock' && (
           <Grid hasGutter>
             <GridItem span={6}>
               <FormGroup label="Start Tags (comma-separated)" fieldId={`block-${blockIndex}-start-tags`}>
@@ -623,6 +621,18 @@ const BlockConfigModal = ({ block, isEdit, onSubmit, onClose, onTempFlowCreated,
               </FormGroup>
             </GridItem>
           </Grid>
+        )}
+
+        {/* RegexParserBlock specific */}
+        {bundleBlock.block_type === 'RegexParserBlock' && (
+          <FormGroup label="Parsing Pattern (regex)" fieldId={`block-${blockIndex}-parsing-pattern`}>
+            <TextInput
+              type="text"
+              id={`block-${blockIndex}-parsing-pattern`}
+              value={blockConfig.parsing_pattern || ''}
+              onChange={(event, value) => handleBundleBlockChange(blockIndex, 'parsing_pattern', value)}
+            />
+          </FormGroup>
         )}
 
         {/* PromptBuilderBlock specific */}

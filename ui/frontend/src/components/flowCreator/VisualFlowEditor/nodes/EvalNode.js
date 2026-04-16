@@ -6,7 +6,7 @@ import { CheckCircleIcon } from '@patternfly/react-icons';
  * Used in the NodeConfigDrawer for configuring evaluation nodes
  * 
  * Eval nodes are special - they auto-generate multiple blocks:
- * PromptBuilder + LLMChat + LLMResponseExtractor + TextParser + ColumnValueFilter
+ * PromptBuilder + LLMChat + LLMResponseExtractor + TagParserBlock/RegexParserBlock + ColumnValueFilter
  */
 export const EvalNodeConfig = {
   type: 'eval',
@@ -272,15 +272,16 @@ YES or NO
           extract_content: true,
         },
       },
-      // 4. Text Parser
+      // 4. Parser (Tag or Regex)
       {
-        block_type: 'TextParserBlock',
+        block_type: config.parsing_pattern?.trim() ? 'RegexParserBlock' : 'TagParserBlock',
         block_config: {
           block_name: `parse_${baseName}`,
           input_cols: `extract_${baseName}_content`,
           output_cols: [`${baseName}_explanation`, `${baseName}_judgment`],
-          start_tags: getStartTags(),
-          end_tags: getEndTags(),
+          ...(config.parsing_pattern?.trim()
+            ? { parsing_pattern: config.parsing_pattern }
+            : { start_tags: getStartTags(), end_tags: getEndTags() }),
         },
       },
       // 5. Column Value Filter
